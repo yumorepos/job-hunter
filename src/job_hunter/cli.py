@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import sqlite3
+from typing import cast
 
 import click
 import httpx
@@ -42,11 +44,11 @@ def _rows_to_jobs(rows: list) -> list[JobRecord]:
 
 
 async def scrape_all(settings: Settings) -> tuple[dict[str, int], dict[str, str]]:
-    client_kwargs: dict[str, object] = {"follow_redirects": True}
+    transport: httpx.AsyncHTTPTransport | None = None
     if settings.proxy_url:
-        client_kwargs["transport"] = httpx.AsyncHTTPTransport(proxy=settings.proxy_url)
+        transport = httpx.AsyncHTTPTransport(proxy=settings.proxy_url)
 
-    async with httpx.AsyncClient(**client_kwargs) as client:
+    async with httpx.AsyncClient(follow_redirects=True, transport=transport) as client:
         results = await asyncio.gather(
             *[run_scraper_safe(scraper, client, settings) for scraper in SCRAPERS]
         )
@@ -263,13 +265,13 @@ def stats(settings: Settings) -> None:
     click.echo(f"Total jobs collected: {metrics['total']}")
     click.echo(f"New jobs today: {metrics['new_today']}")
     click.echo("Top companies hiring:")
-    for row in metrics["top_companies"]:
+    for row in cast(list[sqlite3.Row], metrics["top_companies"]):
         click.echo(f"- {row['company']}: {row['count']}")
     click.echo("Top job locations:")
-    for row in metrics["top_locations"]:
+    for row in cast(list[sqlite3.Row], metrics["top_locations"]):
         click.echo(f"- {row['location']}: {row['count']}")
     click.echo("Remote vs onsite distribution:")
-    for row in metrics["remote_split"]:
+    for row in cast(list[sqlite3.Row], metrics["remote_split"]):
         click.echo(f"- {row['mode']}: {row['count']}")
     click.echo("Most common skills/tags:")
     for tag, count in sorted(tags.items(), key=lambda item: item[1], reverse=True)[:5]:

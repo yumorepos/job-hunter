@@ -22,3 +22,5 @@ jobs:
         run: black --check --target-version py311 .
       - name: Pytest
         run: pytest -q
+      - name: Mypy
+        run: mypy src

@@ -19,6 +19,7 @@ dev = [
   "ruff>=0.6.0",
   "black>=24.0.0",
   "pytest-asyncio>=0.23.0",
+  "mypy>=1.11.0",
 ]
 
 [project.scripts]
@@ -34,3 +35,11 @@ target-version = "py311"
 [tool.black]
 line-length = 100
 target-version = ["py311"]
+
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+pretty = true
