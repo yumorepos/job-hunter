@@ -1,0 +1,3 @@
+title,company,location,source,url,date_posted,remote_flag,tags,description,score,reasons
+Python Backend Engineer,Acme,Remote,remoteok,https://example.com/jobs/1,2026-03-11,True,"python,backend",Build backend APIs with Python.,88.0,"title matched: python, backend | preferred role alignment | remote preference | fresh posting"
+Data Automation Developer,DataCorp,"Toronto, Canada",arbeitnow,https://example.com/jobs/2,2026-03-10,False,"data,automation",Automate ETL jobs and analytics tooling.,67.5,"description matched: data, automation | preferred location | fresh posting"

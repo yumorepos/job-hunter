@@ -1,17 +1,6 @@
-# Job Hunter (Production Refactor)
+# Job Hunter CLI
 
-Job Hunter is a production-grade CLI for multi-source job discovery, normalization, scoring, storage, and export.
-
-## Highlights
-
-- Modular architecture under `src/job_hunter`.
-- Source adapters for Indeed, RemoteOK, Arbeitnow, and HackerNews.
-- Normalized job model with deterministic fingerprint deduplication.
-- Weighted scoring with human-readable match reasons.
-- SQLite with migrations, indexes, and optional FTS5 search.
-- Markdown digest plus CSV and JSON export.
-- Per-source failure isolation with retries/backoff and degraded-mode operation.
-- Packaging, lint/test config, and unit tests.
+Job Hunter is an intelligent, lightweight job discovery engine that scrapes multiple sources, normalizes records, ranks opportunities, and exports portfolio-friendly outputs.
 
 ## Installation
 
@@ -21,38 +10,74 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## CLI
+## Quickstart
 
 ```bash
 job-hunter scrape
+job-hunter search "python backend" --why --days 14
 job-hunter digest --days 7 --output digest.md
-job-hunter search "python remote"
 job-hunter export --days 7 --csv-path jobs.csv --json-path jobs.json
+job-hunter stats
 ```
 
 ## Configuration
 
-Environment variables:
+Supports layered config resolution:
 
-- `JOB_HUNTER_DB` (default `jobs.db`)
-- `JOB_HUNTER_TIMEOUT`
-- `JOB_HUNTER_MAX_RETRIES`
-- `JOB_HUNTER_BACKOFF`
-- `JOB_HUNTER_MIN_SCORE`
-- `JOB_HUNTER_SENIORITY`
+`defaults → config.toml → environment variables → CLI overrides`
 
-## Development
+Example `config.toml`:
+
+```toml
+keywords = ["python", "data", "backend"]
+exclude = ["senior", "staff"]
+locations = ["remote", "canada"]
+min_score = 50
+```
+
+## Example Output
+
+- Digest example: [`example_digest.md`](example_digest.md)
+- CSV export example: [`example_export.csv`](example_export.csv)
+- JSON export example: [`example_export.json`](example_export.json)
+
+Search example:
+
+```text
+1. [ 34.0] Python Backend Developer | Acme | Remote | https://example.com/jobs/1
+   why: title matched: python, backend; remote preference; fresh posting
+```
+
+Stats example:
+
+```text
+Total jobs collected: 182
+New jobs today: 21
+Top companies:
+- Acme: 9
+- DataCorp: 7
+```
+
+## Architecture
+
+```text
+CLI (click)
+  ├── config.py (defaults + TOML + env + overrides)
+  ├── scrapers/* (source adapters + retry/fallback)
+  ├── models.py (normalization + fingerprint)
+  ├── db.py (SQLite schema, FTS, fuzzy search, stats)
+  ├── scoring.py (weighted ranking + match reasons + duplicate penalty)
+  ├── digest.py / exporters.py (Markdown, CSV, JSON)
+  └── tests/* (scoring, DB, config, resilience)
+```
+
+## Contributing
 
 ```bash
 pip install -e .[dev]
 ruff check .
 black --check .
-pytest
+pytest -q
 ```
 
-## Migration Notes / Breaking Changes
-
-- Legacy single-file prototype was replaced with an installable package CLI (`job_hunter.cli`).
-- SQLite schema changed to normalized fields (`date_posted`, `remote_flag`, `fingerprint`).
-- Deduplication is now fingerprint-based instead of URL-only.
-- Digest is relevance-grouped and can include match explanations.
+Please include tests for behavior changes and keep modules single-purpose.
