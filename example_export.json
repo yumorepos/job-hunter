@@ -1,0 +1,16 @@
+[
+  {
+    "title": "Python Backend Engineer",
+    "company": "Acme",
+    "location": "Remote",
+    "source": "remoteok",
+    "url": "https://example.com/jobs/1",
+    "date_posted": "2026-03-11",
+    "remote_flag": true,
+    "tags": ["python", "backend"],
+    "description": "Build backend APIs with Python.",
+    "fingerprint": "demo-fingerprint-1",
+    "score": 88.0,
+    "reasons": ["title matched: python, backend", "preferred role alignment", "remote preference", "fresh posting"]
+  }
+]
