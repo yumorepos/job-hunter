@@ -203,7 +203,7 @@ def search_jobs(
     return scored[:limit]
 
 
-def job_stats(conn: sqlite3.Connection) -> dict[str, list[sqlite3.Row] | sqlite3.Row | int]:
+def job_stats(conn: sqlite3.Connection) -> dict[str, object]:
     total = conn.execute("SELECT COUNT(*) AS total FROM jobs").fetchone()["total"]
     new_today = conn.execute(
         "SELECT COUNT(*) AS total FROM jobs WHERE date_posted = date('now')"
