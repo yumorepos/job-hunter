@@ -1,60 +1,58 @@
-# 🔍 Job Hunter
+# Job Hunter (Production Refactor)
 
-**Automated job scraper for Python, data, and automation roles.**
+Job Hunter is a production-grade CLI for multi-source job discovery, normalization, scoring, storage, and export.
 
-A CLI tool that scrapes public job boards, filters listings by keywords, deduplicates with SQLite, and generates daily markdown digests. Built to automate the most tedious part of job hunting.
+## Highlights
 
-## Features
+- Modular architecture under `src/job_hunter`.
+- Source adapters for Indeed, RemoteOK, Arbeitnow, and HackerNews.
+- Normalized job model with deterministic fingerprint deduplication.
+- Weighted scoring with human-readable match reasons.
+- SQLite with migrations, indexes, and optional FTS5 search.
+- Markdown digest plus CSV and JSON export.
+- Per-source failure isolation with retries/backoff and degraded-mode operation.
+- Packaging, lint/test config, and unit tests.
 
-| | Feature | Description |
-|-|---------|-------------|
-| 🌐 | **Multi-Source Scraping** | Indeed RSS, RemoteOK API, Arbeitnow API, HackerNews Who's Hiring |
-| 🔍 | **Smart Filtering** | Keyword matching for Python, data analyst, automation, junior dev roles |
-| 🗄️ | **SQLite Deduplication** | Tracks seen listings by URL — no duplicates across runs |
-| 📋 | **Markdown Digests** | Generates formatted daily summaries of new listings |
-| 🖥️ | **Rich CLI** | Beautiful terminal output with tables and formatting |
-| ⚡ | **Async Scraping** | Concurrent HTTP requests for fast data collection |
-
-## Quick Start
+## Installation
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Scrape all sources
-python job_hunter.py scrape
-
-# Generate today's digest
-python job_hunter.py digest
-
-# Search stored listings
-python job_hunter.py search "data engineer"
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
-## Tech Stack
+## CLI
 
-- **Python 3.12** — async/await, type hints, dataclasses
-- **httpx** — async HTTP client for API calls
-- **SQLite** — local storage with deduplication
-- **Click** — CLI framework
-- **Rich** — terminal formatting and tables
-
-## Architecture
-
-```
-job_hunter.py
-├── Database layer (SQLite init, insert, query, dedup)
-├── Scrapers (Indeed RSS, RemoteOK, Arbeitnow, HN)
-│   └── Each returns standardized Job objects
-├── Filter engine (keyword matching, location)
-├── Digest generator (Markdown output)
-└── CLI (Click commands: scrape, digest, search)
+```bash
+job-hunter scrape
+job-hunter digest --days 7 --output digest.md
+job-hunter search "python remote"
+job-hunter export --days 7 --csv-path jobs.csv --json-path jobs.json
 ```
 
-## Why I Built This
+## Configuration
 
-Job hunting involves checking the same 5 sites every day. I automated it — because that's what I do. This project demonstrates web scraping, API integration, async Python, data persistence, and CLI design.
+Environment variables:
 
-## License
+- `JOB_HUNTER_DB` (default `jobs.db`)
+- `JOB_HUNTER_TIMEOUT`
+- `JOB_HUNTER_MAX_RETRIES`
+- `JOB_HUNTER_BACKOFF`
+- `JOB_HUNTER_MIN_SCORE`
+- `JOB_HUNTER_SENIORITY`
 
-MIT
+## Development
+
+```bash
+pip install -e .[dev]
+ruff check .
+black --check .
+pytest
+```
+
+## Migration Notes / Breaking Changes
+
+- Legacy single-file prototype was replaced with an installable package CLI (`job_hunter.cli`).
+- SQLite schema changed to normalized fields (`date_posted`, `remote_flag`, `fingerprint`).
+- Deduplication is now fingerprint-based instead of URL-only.
+- Digest is relevance-grouped and can include match explanations.
