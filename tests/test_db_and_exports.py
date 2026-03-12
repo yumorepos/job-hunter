@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from click.testing import CliRunner
+
+from job_hunter.cli import cli
 from job_hunter.config import Settings
 from job_hunter.db import connect, job_stats, search_jobs, upsert_jobs
 from job_hunter.digest import build_markdown_digest
@@ -14,26 +17,26 @@ def test_db_dedupe_and_search(tmp_path: Path):
     conn = connect(db)
     settings = Settings(similarity_threshold=0.8)
     one = JobRecord(
-        title="Python Developer",
-        company="Acme",
+        title="Software Engineer, Python",
+        company="Acme Inc.",
         location="Remote",
         source="remoteok",
         url="https://example.com/1",
         date_posted="2026-01-01",
         remote_flag=True,
         tags=["python"],
-        description="Automation role",
+        description="Automation role building Python services",
     ).finalize()
     two = JobRecord(
-        title="Python Developer",
-        company="Acme Inc",
+        title="Python Software Engineer",
+        company="Acme",
         location="Remote",
         source="remoteok",
         url="https://example.com/2",
         date_posted="2025-01-01",
         remote_flag=True,
         tags=["python"],
-        description="Automation role",
+        description="Build Python services automation role",
     ).finalize()
     assert upsert_jobs(conn, [one], settings) == 1
     assert upsert_jobs(conn, [two], settings) == 0
@@ -67,3 +70,28 @@ def test_digest_and_exports(tmp_path: Path):
     export_json(scored, json_path)
     assert csv_path.exists()
     assert json_path.exists()
+
+
+def test_recommend_command(tmp_path: Path, monkeypatch):
+    db = tmp_path / "jobs.db"
+    conn = connect(db)
+    settings = Settings(similarity_threshold=0.8)
+    job = JobRecord(
+        title="Backend Python Engineer",
+        company="Stripe",
+        location="Remote",
+        source="remoteok",
+        url="https://example.com/stripe",
+        date_posted="2026-03-10",
+        remote_flag=True,
+        tags=["python", "backend"],
+        description="Build backend systems in Python",
+    ).finalize()
+    upsert_jobs(conn, [job], settings)
+    conn.close()
+
+    monkeypatch.setenv("JOB_HUNTER_DB", str(db))
+    result = CliRunner().invoke(cli, ["recommend", "--limit", "1", "--why"])
+    assert result.exit_code == 0
+    assert "Recommended Jobs" in result.output
+    assert "Why recommended" in result.output

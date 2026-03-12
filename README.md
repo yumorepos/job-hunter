@@ -1,20 +1,39 @@
-# Job Hunter CLI
+# Job Hunter — Intelligent Job Discovery Engine
 
-Job Hunter is an intelligent, lightweight job discovery engine that scrapes multiple sources, normalizes records, ranks opportunities, and exports portfolio-friendly outputs.
+A production-grade Python CLI that aggregates multi-source jobs, normalizes them, ranks them with explainable scoring, and delivers actionable recommendations.
+
+## Why this project
+
+Job Hunter is designed as a **job intelligence engine**, not just a scraper:
+- resilient source collection with graceful degradation
+- explainable ranking and personalized recommendations
+- deduplication across near-duplicate postings
+- export-ready outputs for portfolio and workflow automation
+
+## Key features
+
+- Multi-source scraping with retry/backoff, rotating User-Agent, proxy support, and per-source failure isolation.
+- Layered config precedence: `defaults → config.toml → environment variables → CLI overrides`.
+- Weighted ranking with reasons: keyword relevance, role/location/remote alignment, freshness, penalties.
+- Near-duplicate handling with fuzzy title/company/description similarity and newest-posting preference.
+- Fast SQLite storage with optional FTS5 + fuzzy reranking.
+- Human-readable digest + CSV/JSON exports.
+- Market intelligence report via `stats` and personalized picks via `recommend`.
 
 ## Installation
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e .[dev]
 ```
 
-## Quickstart
+## CLI examples
 
 ```bash
 job-hunter scrape
-job-hunter search "python backend" --why --days 14
+job-hunter search "python backend" --limit 5 --why --days 14 --min-score 5
+job-hunter recommend --limit 10 --days 30 --why --remote-only
 job-hunter digest --days 7 --output digest.md
 job-hunter export --days 7 --csv-path jobs.csv --json-path jobs.json
 job-hunter stats
@@ -22,11 +41,7 @@ job-hunter stats
 
 ## Configuration
 
-Supports layered config resolution:
-
-`defaults → config.toml → environment variables → CLI overrides`
-
-Example `config.toml`:
+Create `config.toml` (optional):
 
 ```toml
 keywords = ["python", "data", "backend"]
@@ -35,49 +50,79 @@ locations = ["remote", "canada"]
 min_score = 50
 ```
 
-## Example Output
+Supported environment overrides include:
+- `JOB_HUNTER_DB`
+- `JOB_HUNTER_TIMEOUT`
+- `JOB_HUNTER_MAX_RETRIES`
+- `JOB_HUNTER_BACKOFF`
+- `JOB_HUNTER_PROXY`
+- `JOB_HUNTER_KEYWORDS`
+- `JOB_HUNTER_EXCLUDE`
+- `JOB_HUNTER_LOCATIONS`
+- `JOB_HUNTER_MIN_SCORE`
 
-- Digest example: [`example_digest.md`](example_digest.md)
-- CSV export example: [`example_export.csv`](example_export.csv)
-- JSON export example: [`example_export.json`](example_export.json)
+## Example outputs
 
-Search example:
+- Digest: [`example_digest.md`](example_digest.md)
+- CSV export: [`example_export.csv`](example_export.csv)
+- JSON export: [`example_export.json`](example_export.json)
+- Recommendations: [`example_recommend.md`](example_recommend.md)
+- Stats report: [`example_stats.md`](example_stats.md)
+
+### Sample recommend output
 
 ```text
-1. [ 34.0] Python Backend Developer | Acme | Remote | https://example.com/jobs/1
-   why: title matched: python, backend; remote preference; fresh posting
+Recommended Jobs
+
+1. Backend Python Engineer — Stripe
+   Score: 91.0
+   Location: Remote
+   Posted: 2026-03-10
+   Why recommended:
+   - strong title relevance: python, backend
+   - role alignment boost
+   - remote preference boost
+   - freshness boost
 ```
 
-Stats example:
+### Sample stats output
 
 ```text
 Total jobs collected: 182
 New jobs today: 21
-Top companies:
-- Acme: 9
-- DataCorp: 7
+Top companies hiring:
+- Stripe: 9
+- Shopify: 7
+Top job locations:
+- Remote: 113
 ```
 
-## Architecture
+## Architecture overview
 
 ```text
-CLI (click)
-  ├── config.py (defaults + TOML + env + overrides)
-  ├── scrapers/* (source adapters + retry/fallback)
-  ├── models.py (normalization + fingerprint)
-  ├── db.py (SQLite schema, FTS, fuzzy search, stats)
-  ├── scoring.py (weighted ranking + match reasons + duplicate penalty)
-  ├── digest.py / exporters.py (Markdown, CSV, JSON)
-  └── tests/* (scoring, DB, config, resilience)
+src/job_hunter/
+  cli.py          # command orchestration (search/digest/export/stats/recommend)
+  config.py       # defaults + config file + env + CLI override resolution
+  db.py           # schema, dedupe-aware insert, FTS/fuzzy search, stats
+  scoring.py      # explainable weighted scoring + duplicate penalties
+  models.py       # normalized job model + fingerprint/date normalization
+  scrapers/*      # source adapters + resilient fetch/fallback behavior
+  digest.py       # markdown digest rendering
+  exporters.py    # CSV/JSON exports
 ```
 
-## Contributing
+## Reliability and degraded mode
+
+If a source fails (e.g., upstream 403/429), scraping continues for remaining sources. Failures are logged and reported without crashing the run.
+
+## Development
 
 ```bash
-pip install -e .[dev]
 ruff check .
 black --check .
 pytest -q
 ```
 
-Please include tests for behavior changes and keep modules single-purpose.
+## Contributing
+
+PRs should keep modules focused, add tests for behavior changes, and preserve graceful failure behavior for external sources.

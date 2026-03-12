@@ -7,18 +7,12 @@ import click
 import httpx
 
 from .config import Settings, load_settings
-from .db import (
-    connect,
-    fetch_recent_jobs,
-    job_stats,
-    search_jobs as db_search_jobs,
-    upsert_jobs,
-)
+from .db import connect, fetch_recent_jobs, job_stats, search_jobs as db_search_jobs, upsert_jobs
 from .digest import build_markdown_digest
 from .exporters import export_csv, export_json
 from .filters import filter_scored_jobs
 from .logging_utils import configure_logging
-from .models import JobRecord
+from .models import JobRecord, ScoredJob
 from .scoring import dedupe_similarity_penalty, score_job
 from .scrapers.arbeitnow import ArbeitnowScraper
 from .scrapers.base import run_scraper_safe
@@ -68,6 +62,15 @@ async def scrape_all(settings: Settings) -> tuple[dict[str, int], dict[str, str]
         stats[source] = upsert_jobs(conn, jobs, settings)
     conn.close()
     return stats, failures
+
+
+def _score_recent_jobs(settings: Settings, days: int) -> list[ScoredJob]:
+    conn = connect(settings.db_path)
+    jobs = _rows_to_jobs(fetch_recent_jobs(conn, days=days))
+    conn.close()
+    scored = [score_job(job, settings) for job in jobs]
+    deduped = dedupe_similarity_penalty(scored, settings)
+    return filter_scored_jobs(deduped, settings)
 
 
 @click.group()
@@ -122,11 +125,7 @@ def scrape(settings: Settings) -> None:
 @click.pass_obj
 def digest(settings: Settings, days: int, output: Path, include_reasons: bool) -> None:
     """Generate markdown digest from recent jobs."""
-    conn = connect(settings.db_path)
-    jobs = _rows_to_jobs(fetch_recent_jobs(conn, days=days))
-    conn.close()
-    scored = dedupe_similarity_penalty([score_job(job, settings) for job in jobs], settings)
-    filtered = filter_scored_jobs(scored, settings)
+    filtered = _score_recent_jobs(settings, days)
     output.write_text(
         build_markdown_digest(filtered, include_reasons=include_reasons), encoding="utf-8"
     )
@@ -138,25 +137,99 @@ def digest(settings: Settings, days: int, output: Path, include_reasons: bool) -
 @click.option("--limit", default=20, show_default=True)
 @click.option("--company", default=None, help="Filter by company substring")
 @click.option("--days", default=None, type=int, help="Only jobs from last N days")
+@click.option("--min-score", type=float, default=None)
 @click.option("--why/--no-why", default=False, help="Show scoring reasons")
 @click.pass_obj
 def search(
-    settings: Settings, query: str, limit: int, company: str | None, days: int | None, why: bool
+    settings: Settings,
+    query: str,
+    limit: int,
+    company: str | None,
+    days: int | None,
+    min_score: float | None,
+    why: bool,
 ) -> None:
     """Search jobs with FTS ranking + fuzzy relevance rerank."""
     conn = connect(settings.db_path)
-    rows = db_search_jobs(conn, query, limit=limit, company=company, days=days)
+    rows = db_search_jobs(conn, query, limit=limit * 3, company=company, days=days)
     conn.close()
     if not rows:
-        click.echo("No results")
+        click.echo("No results found. Try broader keywords or a larger --days range.")
         return
+
+    score_floor = min_score if min_score is not None else settings.min_relevance_score
     scored = [score_job(job, settings) for job in _rows_to_jobs(rows)]
-    for idx, item in enumerate(sorted(scored, key=lambda row: row.score, reverse=True), start=1):
+    filtered = [
+        row
+        for row in sorted(scored, key=lambda item: item.score, reverse=True)
+        if row.score >= score_floor
+    ]
+
+    if not filtered:
+        click.echo("Results found, but none met the score threshold. Lower --min-score.")
+        return
+
+    for idx, item in enumerate(filtered[:limit], start=1):
         click.echo(
             f"{idx}. [{item.score:>5.1f}] {item.job.title} | {item.job.company} | {item.job.location} | {item.job.url}"
         )
         if why:
-            click.echo(f"   why: {'; '.join(item.reasons)}")
+            click.echo(f"   why matched: {'; '.join(item.reasons)}")
+
+
+@cli.command("recommend")
+@click.option("--limit", default=10, show_default=True)
+@click.option("--days", default=30, show_default=True)
+@click.option("--why/--no-why", default=False)
+@click.option("--company", default=None, help="Filter recommendations by company substring")
+@click.option("--location", default=None, help="Filter recommendations by location substring")
+@click.option("--remote-only", is_flag=True, default=False)
+@click.option("--min-score", type=float, default=None)
+@click.pass_obj
+def recommend(
+    settings: Settings,
+    limit: int,
+    days: int,
+    why: bool,
+    company: str | None,
+    location: str | None,
+    remote_only: bool,
+    min_score: float | None,
+) -> None:
+    """Recommend the best jobs using preference-aware ranking."""
+    scored = _score_recent_jobs(settings, days)
+    threshold = min_score if min_score is not None else settings.min_relevance_score
+    recommendations = [item for item in scored if item.score >= threshold]
+
+    if company:
+        recommendations = [
+            item for item in recommendations if company.lower() in item.job.company.lower()
+        ]
+    if location:
+        recommendations = [
+            item for item in recommendations if location.lower() in item.job.location.lower()
+        ]
+    if remote_only:
+        recommendations = [item for item in recommendations if item.job.remote_flag]
+
+    if not recommendations:
+        click.echo("No recommendations matched the selected filters.")
+        return
+
+    click.echo("Recommended Jobs\n")
+    for idx, item in enumerate(recommendations[:limit], start=1):
+        job = item.job
+        click.echo(f"{idx}. {job.title} — {job.company}")
+        click.echo(f"   Score: {item.score:.1f}")
+        click.echo(f"   Location: {job.location}")
+        click.echo(f"   Posted: {job.date_posted}")
+        click.echo(f"   Source: {job.source}")
+        click.echo(f"   URL: {job.url}")
+        if why:
+            click.echo("   Why recommended:")
+            for reason in item.reasons:
+                click.echo(f"   - {reason}")
+        click.echo("")
 
 
 @cli.command("export")
@@ -166,11 +239,7 @@ def search(
 @click.pass_obj
 def export_cmd(settings: Settings, days: int, csv_path: Path, json_path: Path) -> None:
     """Export recent scored jobs to CSV and JSON."""
-    conn = connect(settings.db_path)
-    jobs = _rows_to_jobs(fetch_recent_jobs(conn, days=days))
-    conn.close()
-    scored = dedupe_similarity_penalty([score_job(job, settings) for job in jobs], settings)
-    filtered = filter_scored_jobs(scored, settings)
+    filtered = _score_recent_jobs(settings, days)
     export_csv(filtered, csv_path)
     export_json(filtered, json_path)
     click.echo(f"Exported {len(filtered)} jobs -> {csv_path}, {json_path}")
@@ -193,16 +262,16 @@ def stats(settings: Settings) -> None:
 
     click.echo(f"Total jobs collected: {metrics['total']}")
     click.echo(f"New jobs today: {metrics['new_today']}")
-    click.echo("Top companies:")
+    click.echo("Top companies hiring:")
     for row in metrics["top_companies"]:
         click.echo(f"- {row['company']}: {row['count']}")
-    click.echo("Top locations:")
+    click.echo("Top job locations:")
     for row in metrics["top_locations"]:
         click.echo(f"- {row['location']}: {row['count']}")
-    click.echo("Remote vs onsite:")
+    click.echo("Remote vs onsite distribution:")
     for row in metrics["remote_split"]:
         click.echo(f"- {row['mode']}: {row['count']}")
-    click.echo("Top skills/tags:")
+    click.echo("Most common skills/tags:")
     for tag, count in sorted(tags.items(), key=lambda item: item[1], reverse=True)[:5]:
         click.echo(f"- {tag}: {count}")
 

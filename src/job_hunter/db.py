@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .config import Settings
 from .models import JobRecord
-from .utils import normalize_text
+from .utils import normalize_company_name, normalize_text, token_similarity
 
 SCHEMA_VERSION = 2
 
@@ -80,7 +80,8 @@ def upsert_jobs(
     active_settings = settings or Settings()
     inserted = 0
     for job in jobs:
-        if _has_similar_job(conn, job, active_settings.similarity_threshold):
+        keep = _should_insert_over_similar(conn, job, active_settings.similarity_threshold)
+        if not keep:
             continue
         cur = conn.execute(
             """
@@ -105,10 +106,10 @@ def upsert_jobs(
     return inserted
 
 
-def _has_similar_job(conn: sqlite3.Connection, job: JobRecord, threshold: float) -> bool:
+def _should_insert_over_similar(conn: sqlite3.Connection, job: JobRecord, threshold: float) -> bool:
     rows = conn.execute(
         """
-        SELECT title, company, description, date_posted
+        SELECT id, title, company, description, date_posted
         FROM jobs
         WHERE source = ?
         ORDER BY date_posted DESC
@@ -116,21 +117,28 @@ def _has_similar_job(conn: sqlite3.Connection, job: JobRecord, threshold: float)
         """,
         (job.source,),
     ).fetchall()
+
     for row in rows:
-        title_sim = SequenceMatcher(
-            None, normalize_text(job.title), normalize_text(row["title"])
-        ).ratio()
-        company_sim = SequenceMatcher(
-            None, normalize_text(job.company), normalize_text(row["company"])
-        ).ratio()
-        desc_sim = SequenceMatcher(
-            None,
-            normalize_text(job.description[:240]),
-            normalize_text((row["description"] or "")[:240]),
-        ).ratio()
-        if title_sim >= threshold and company_sim >= 0.6 and desc_sim >= 0.65:
-            return row["date_posted"] >= job.date_posted
-    return False
+        if _is_near_duplicate(job, row, threshold):
+            if job.date_posted > row["date_posted"]:
+                conn.execute("DELETE FROM jobs WHERE id = ?", (row["id"],))
+                return True
+            return False
+    return True
+
+
+def _is_near_duplicate(job: JobRecord, row: sqlite3.Row, threshold: float) -> bool:
+    title_sim = SequenceMatcher(
+        None, normalize_text(job.title), normalize_text(row["title"])
+    ).ratio()
+    title_token_sim = token_similarity(job.title, row["title"])
+    company_sim = SequenceMatcher(
+        None,
+        normalize_company_name(job.company),
+        normalize_company_name(row["company"]),
+    ).ratio()
+    desc_sim = token_similarity(job.description[:240], (row["description"] or "")[:240])
+    return max(title_sim, title_token_sim) >= threshold and company_sim >= 0.75 and desc_sim >= 0.35
 
 
 def fetch_recent_jobs(conn: sqlite3.Connection, days: int = 7) -> list[sqlite3.Row]:
