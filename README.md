@@ -71,8 +71,11 @@ src/job_hunter/
 ## Development and validation
 
 ```bash
+pip install -e ".[dev]"
+pre-commit install
+pre-commit run --all-files
 ruff check .
-black --check --target-version py311 .
+black --check .
 pytest -q
 mypy src
 ```
