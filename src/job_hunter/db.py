@@ -26,8 +26,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ).fetchone()
     current = row["version"] if row else 0
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -42,29 +41,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
             fingerprint TEXT NOT NULL UNIQUE,
             scraped_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
-        """
-    )
+        """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_date ON jobs(date_posted)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_fingerprint ON jobs(fingerprint)")
 
     try:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(
                 title, company, tags, description, content='jobs', content_rowid='id'
             )
-            """
-        )
-        conn.executescript(
-            """
+            """)
+        conn.executescript("""
             CREATE TRIGGER IF NOT EXISTS jobs_ai AFTER INSERT ON jobs BEGIN
                 INSERT INTO jobs_fts(rowid, title, company, tags, description)
                 VALUES (new.id, new.title, new.company, new.tags, new.description);
             END;
-            """
-        )
+            """)
     except sqlite3.OperationalError:
         pass
 
@@ -208,23 +202,17 @@ def job_stats(conn: sqlite3.Connection) -> dict[str, object]:
     new_today = conn.execute(
         "SELECT COUNT(*) AS total FROM jobs WHERE date_posted = date('now')"
     ).fetchone()["total"]
-    top_companies = conn.execute(
-        """
+    top_companies = conn.execute("""
         SELECT company, COUNT(*) AS count FROM jobs GROUP BY company ORDER BY count DESC LIMIT 5
-        """
-    ).fetchall()
-    top_locations = conn.execute(
-        """
+        """).fetchall()
+    top_locations = conn.execute("""
         SELECT location, COUNT(*) AS count FROM jobs GROUP BY location ORDER BY count DESC LIMIT 5
-        """
-    ).fetchall()
-    remote_split = conn.execute(
-        """
+        """).fetchall()
+    remote_split = conn.execute("""
         SELECT CASE WHEN remote_flag = 1 THEN 'remote' ELSE 'onsite' END AS mode,
                COUNT(*) AS count
         FROM jobs GROUP BY mode ORDER BY count DESC
-        """
-    ).fetchall()
+        """).fetchall()
     return {
         "total": total,
         "new_today": new_today,
