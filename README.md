@@ -1,5 +1,8 @@
 # Job Hunter
 
+[![CI](https://github.com/yumorepos/job-hunter/actions/workflows/ci.yml/badge.svg)](https://github.com/yumorepos/job-hunter/actions/workflows/ci.yml)
+
+
 Job Hunter is a Python CLI that collects job posts from several public sources, normalizes them, stores them in SQLite, and provides search, digest, recommendation, and export commands.
 
 ## What is implemented
