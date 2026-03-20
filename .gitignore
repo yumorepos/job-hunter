@@ -10,4 +10,5 @@ dist/
 *.log
 .vscode/
 .idea/
-build/
+build/jobs.db-shm
+jobs.db-wal
