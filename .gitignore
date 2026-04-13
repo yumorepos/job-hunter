@@ -12,3 +12,11 @@ dist/
 .idea/
 build/jobs.db-shm
 jobs.db-wal
+.env.*
+!.env.example
+*.db
+*.sqlite3
+*.bak
+*.backup
+*.old
+.DS_Store
