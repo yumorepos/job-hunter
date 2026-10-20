@@ -1,0 +1,7 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+TAB NAME: aviation_leads_example.csv>
+index,title,company,location,posting_date,url,application_status,french_requirement,work_type,evidence_note,eligibility_to_check,checked_at
+0,Flight Operations Controller,Example Air,"Calgary, AB",2026-10-19,https://example.com/jobs/operations-controller,review,unknown,Full-time,Example fixture only — not an actual posting,Check current listing and essential requirements,2026-10-20
+1,Flight Dispatcher,Demo Airline,"Toronto, ON",2026-10-18,https://example.com/jobs/dispatcher,applied,not_specified,Full-time,Example fixture only — application tracking test,Follow up instead of resubmitting,2026-10-20
+2,Crew Scheduler,Sample Airways,"Montréal, QC",2026-10-17,https://example.com/jobs/crew-scheduler,skip,required,Full-time,Example fixture only — French gate test,Do not treat title score as eligibility,2026-10-20
+3,Flight Coordinator,Demo Charter,"Toronto, ON",2026-10-16,https://example.com/jobs/flight-coordinator,verify_submission,unknown,Full-time,Example fixture only — verify submission test,Check prior applications,2026-10-20

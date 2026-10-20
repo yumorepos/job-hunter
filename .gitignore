@@ -20,3 +20,7 @@ jobs.db-wal
 *.backup
 *.old
 .DS_Store
+
+# Personal application tracking — never commit to public GitHub
+aviation_leads_????-??-??.csv
+SHORTLIST_????-??-??.md

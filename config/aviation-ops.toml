@@ -1,0 +1,7 @@
+# Optional config for the original Job Hunter CLI.
+# Its current automated sources lean toward tech; use the curated shortlist too.
+keywords = ["flight dispatcher", "flight operations", "crew scheduler", "flight coordinator", "network operations", "operations analyst", "flight follower", "crew scheduling"]
+exclude = ["senior", "principal", "director", "vice president"]
+locations = ["canada", "toronto", "ontario", "montreal", "montréal", "calgary", "kingston", "remote"]
+roles = ["flight dispatcher", "flight operations controller", "crew scheduler", "flight coordinator", "operations analyst", "network operations coordinator"]
+min_score = 5

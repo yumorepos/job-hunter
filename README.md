@@ -96,3 +96,21 @@ mypy src
 - JSON export: [`example_export.json`](example_export.json)
 - Recommendations: [`example_recommend.md`](example_recommend.md)
 - Stats report: [`example_stats.md`](example_stats.md)
+
+## Aviation operations recovery workflow
+
+This repository also includes an **offline, curated aviation-operations job tracker** for flight dispatch, operations control, crew scheduling and operations analysis. It supplements the original developer-job scrapers rather than replacing them.
+
+```bash
+python tools/aviation_shortlist.py --input data/aviation_leads_example.csv --output aviation-example-report.md
+pytest -q tests/test_aviation_shortlist.py
+```
+
+To use the existing CLI with aviation search terms (source coverage is not guaranteed):
+
+```bash
+job-hunter --config config/aviation-ops.toml scrape
+job-hunter --config config/aviation-ops.toml recommend --days 30 --why
+```
+
+The example input contains **fictional** entries. Keep actual applications and private tracking files out of GitHub. The tool separates unsubmitted leads, uncertain prior submissions, applied roles, and hard mismatches (including verified language requirements). A title relevance score is **not** proof of eligibility, posting availability, or suitability. See [the aviation workflow guide](docs/AVIATION_WORKFLOW.md) for input fields, checks, and limitations.
